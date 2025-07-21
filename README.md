@@ -2,7 +2,7 @@
 
 A Qt-based GUI application for extracting specific pages from PDF documents.
 
-![Application Screenshot](screenshot.png) *(optional: add actual screenshot later)*
+![Application Screenshot](screenshot.png)
 
 ## Features
 
