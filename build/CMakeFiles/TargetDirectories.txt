@@ -1,0 +1,5 @@
+/media/emran/sdcard/pytool/project/build/CMakeFiles/PdfExtractor.dir
+/media/emran/sdcard/pytool/project/build/CMakeFiles/edit_cache.dir
+/media/emran/sdcard/pytool/project/build/CMakeFiles/rebuild_cache.dir
+/media/emran/sdcard/pytool/project/build/CMakeFiles/PdfExtractor_autogen_timestamp_deps.dir
+/media/emran/sdcard/pytool/project/build/CMakeFiles/PdfExtractor_autogen.dir
