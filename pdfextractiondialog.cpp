@@ -1,4 +1,5 @@
 #include "pdfextractiondialog.h"
+#include "errorcodes.h" // Include the new error codes header
 #include <QDate>
 #include <QVBoxLayout>
 #include <QFormLayout>
@@ -18,10 +19,12 @@
 #include <cstdlib> // For system()
 #include <QFile>   // For reading error output
 #include <QTextStream>
+#include <QApplication> // For clipboard access
+#include <QClipboard>   // For clipboard access
 
 PdfExtractionDialog::PdfExtractionDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle("PDF Extraction Tool");
-    setFixedSize(600, 450);
+    setFixedSize(700, 600);
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
@@ -78,7 +81,12 @@ PdfExtractionDialog::PdfExtractionDialog(QWidget *parent) : QDialog(parent) {
     // Date input
     dateEdit = new QLineEdit(this);
     dateEdit->setPlaceholderText("e.g., MAY 20, 2025 or 5-20-2025");
-    inputLayout->addRow("Date:", dateEdit);
+    QHBoxLayout *dateLayout = new QHBoxLayout();
+    dateLayout->addWidget(dateEdit);
+    QPushButton *showPageNumbersButton = new QPushButton("Show Page Numbers", this);
+    showPageNumbersButton->setStyleSheet("QPushButton { background-color: #008CBA; color: white; }"); // Blue color
+    dateLayout->addWidget(showPageNumbersButton);
+    inputLayout->addRow("Date:", dateLayout);
 
     // Options group
     QGroupBox *optionsGroup = new QGroupBox("Options", this);
@@ -100,14 +108,33 @@ PdfExtractionDialog::PdfExtractionDialog(QWidget *parent) : QDialog(parent) {
     mainLayout->addWidget(inputGroup);
     mainLayout->addWidget(optionsGroup);
 
+    // New GroupBox for Page Number Results
+    QGroupBox *pageNumbersGroup = new QGroupBox("Matching Page Numbers", this);
+    QVBoxLayout *pageNumbersLayout = new QVBoxLayout(pageNumbersGroup);
+
+    pageNumbersDisplay = new QTextEdit(this);
+    pageNumbersDisplay->setReadOnly(true); // Make it read-only
+    pageNumbersDisplay->setPlaceholderText("Matching page numbers will appear here.");
+    pageNumbersLayout->addWidget(pageNumbersDisplay);
+
+    copyPageNumbersButton = new QPushButton("Copy to Clipboard", this);
+    pageNumbersLayout->addWidget(copyPageNumbersButton);
+    pageNumbersGroup->setVisible(false); // Initially hide this group
+    mainLayout->addWidget(pageNumbersGroup);
+
+
     QPushButton *processButton = new QPushButton("Extract Pages", this);
     processButton->setStyleSheet("QPushButton { background-color: #4CAF50; color: white; }");
-    mainLayout->addWidget(processButton);
+
+    QHBoxLayout *buttonLayout = new QHBoxLayout();
+    buttonLayout->addWidget(processButton);
+    mainLayout->addLayout(buttonLayout);
 
     connect(selectFileButton, &QPushButton::clicked, this, &PdfExtractionDialog::selectPdfFile);
     connect(outputBrowseButton, &QPushButton::clicked, this, &PdfExtractionDialog::selectOutputFile);
     connect(processButton, &QPushButton::clicked, this, &PdfExtractionDialog::processPdf);
     connect(watermarkCheck, &QCheckBox::toggled, watermarkText, &QLineEdit::setEnabled);
+    connect(copyPageNumbersButton, &QPushButton::clicked, this, &PdfExtractionDialog::copyPageNumbersToClipboard); // Connect new button
 
     setLayout(mainLayout);
 }
@@ -204,42 +231,42 @@ QStringList PdfExtractionDialog::parseDateStrings(const QString &dateString) {
 
 QString PdfExtractionDialog::generateOutputFilename(ExtractionMethod method) {
     QFileInfo fileInfo(pdfPath);
-    QString basePath = fileInfo.path() + "/" + fileInfo.completeBaseName();
+    QString basePath = fileInfo.path() + "/catagory/"; //+ fileInfo.completeBaseName();
 
     switch (method) {
         case ExtractionMethod::Date:
             {
                 QStringList dates = dateEdit->text().trimmed().split(',');
-                return basePath + "_date_" + dates[0].trimmed() + ".pdf";
+                return basePath + "date_" + dates[0].trimmed() + ".pdf";
             }
         case ExtractionMethod::Keyword:
             {
                 QString sanitizedKeyword = keywordEdit->text().trimmed();
                 sanitizedKeyword.replace(QRegularExpression("[^a-zA-Z0-9_]+"), "_");
-                return basePath + "_keyword_" + sanitizedKeyword + ".pdf";
+                return basePath + /*"keyword_" +*/ sanitizedKeyword + ".pdf";
             }
         case ExtractionMethod::PageRange:
             {
                 QString sanitizedRange = pageRangeEdit->text().trimmed();
                 sanitizedRange.replace(QRegularExpression("[^a-zA-Z0-9_]+"), "_");
-                return basePath + "_page_no_" + sanitizedRange + ".pdf";
+                return basePath + "page_no_" + sanitizedRange + ".pdf";
             }
         default:
             return basePath + "_extracted.pdf";
     }
 }
 
-bool PdfExtractionDialog::createWatermarkPdf(const QString &watermarkText, const QString &outputPdfPath) {
+PdfExtractorError PdfExtractionDialog::createWatermarkPdf(const QString &watermarkText, const QString &outputPdfPath) {
     QPdfWriter pdfWriter(outputPdfPath);
     if (!pdfWriter.setPageSize(QPageSize(QPageSize::A4))) {
         qDebug() << "Failed to set page size.";
-        return false;
+        return WATERMARK_PDF_CREATION_FAILED;
     }
 
     QPainter painter(&pdfWriter);
     if (!painter.isActive()) {
         qDebug() << "Failed to activate painter.";
-        return false;
+        return WATERMARK_PDF_CREATION_FAILED;
     }
 
     // Set font and color for the watermark
@@ -258,22 +285,145 @@ bool PdfExtractionDialog::createWatermarkPdf(const QString &watermarkText, const
     painter.drawText(-pdfWriter.width() / 4, -pdfWriter.height() / 4, watermarkText);
 
     painter.end();
-    return true;
+    return SUCCESS;
 }
 
 void PdfExtractionDialog::processPdf() {
+    PdfExtractorError error = executePdfExtractionLogic();
+    displayError(error);
+}
+
+void PdfExtractionDialog::copyPageNumbersToClipboard() {
+    QClipboard *clipboard = QApplication::clipboard();
+    clipboard->setText(pageNumbersDisplay->toPlainText());
+    QMessageBox::information(this, "Clipboard", "Page numbers copied to clipboard!");
+}
+
+QPair<QStringList, PdfExtractorError> PdfExtractionDialog::findMatchingPageNumbers(ExtractionMethod method, const QStringList &keywordList) {
+    QStringList pagesToExtract;
+
+    if (system("pdftotext -v > /dev/null 2>&1") != 0) {
+        return qMakePair(QStringList(), PDFTOTEXT_NOT_INSTALLED);
+    }
+
+    qDebug() << "Parsed Keywords:" << keywordList;
+
+    int numPages = 0;
+
+    // Get the number of pages
+    QProcess countProcess;
+    countProcess.start("pdftk", QStringList() << pdfPath << "dump_data");
+    countProcess.waitForFinished();
+    QString countOutput = countProcess.readAllStandardOutput();
+    QRegularExpression re("NumberOfPages: (\\d+)");
+    QRegularExpressionMatch match = re.match(countOutput);
+    if (match.hasMatch()) {
+        numPages = match.captured(1).toInt();
+    }
+    qDebug() << "Number of Pages:" << numPages;
+
+    for (int i = 1; i <= numPages; ++i) {
+        QString tempTextFile = QDir::tempPath() + "/pdftotext_temp.txt";
+        QString command = QString("pdftotext -f %1 -l %1 \"%2\" \"%3\"").arg(i).arg(pdfPath).arg(tempTextFile);
+        qDebug() << "Executing pdftotext command:" << command;
+        int ret = system(command.toStdString().c_str());
+
+        QString pageText;
+        if (ret == 0) {
+            QFile file(tempTextFile);
+            if (file.open(QIODevice::ReadOnly)) {
+                pageText = file.readAll();
+                file.close();
+                file.remove();
+            } else {
+                return qMakePair(QStringList(), TEMP_FILE_IO_ERROR);
+            }
+        } else {
+            return qMakePair(QStringList(), PDFTOTEXT_COMMAND_FAILED);
+        }
+        qDebug() << "Page" << i << "Text:\n" << pageText;
+
+        bool pageMatches = false;
+        if (method == ExtractionMethod::Date || matchAnyKeywordRadio->isChecked()) {
+            for (const QString& key : keywordList) {
+                if (substringRadio->isChecked()) {
+                    if (pageText.contains(key, Qt::CaseInsensitive)) {
+                        pageMatches = true;
+                        break;
+                    }
+                } else {
+                    QRegularExpression re("\\b" + QRegularExpression::escape(key) + "\\b", QRegularExpression::CaseInsensitiveOption);
+                    if (pageText.contains(re)) {
+                        pageMatches = true;
+                        break;
+                    }
+                }
+            }
+        } else if (matchAllKeywordsRadio->isChecked()) {
+            bool allMatch = true;
+            for (const QString& key : keywordList) {
+                if (substringRadio->isChecked()) {
+                    if (!pageText.contains(key, Qt::CaseInsensitive)) {
+                        allMatch = false;
+                        break;
+                    }
+                }
+                else {
+                    QRegularExpression re("\\b" + QRegularExpression::escape(key) + "\\b", QRegularExpression::CaseInsensitiveOption);
+                    if (!pageText.contains(re)) {
+                        allMatch = false;
+                        break;
+                    }
+                }
+            }
+            pageMatches = allMatch;
+        } else {
+            for (const QString& key : keywordList) {
+                if (substringRadio->isChecked()) {
+                    if (pageText.contains(key, Qt::CaseInsensitive)) {
+                        pageMatches = true;
+                        break;
+                    }
+                }
+                else {
+                    QRegularExpression re("\\b" + QRegularExpression::escape(key) + "\\b", QRegularExpression::CaseInsensitiveOption);
+                    if (pageText.contains(re)) {
+                        pageMatches = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (method == ExtractionMethod::Keyword && thresholdEdit->text().toInt() > 0) {
+            int totalMatchCount = 0;
+            for (const QString& key : keywordList) {
+                totalMatchCount += pageText.count(key, Qt::CaseInsensitive);
+            }
+            if (totalMatchCount < thresholdEdit->text().toInt()) {
+                pageMatches = false;
+            }
+        }
+
+        if(pageMatches) {
+            pagesToExtract << QString::number(i);
+        }
+    }
+    return qMakePair(pagesToExtract, SUCCESS);
+}
+
+PdfExtractorError PdfExtractionDialog::executePdfExtractionLogic() {
     qDebug() << "PDF Path:" << pdfPath;
     qDebug() << "Page Range Edit:" << pageRangeEdit->text();
     qDebug() << "Keyword Edit:" << keywordEdit->text();
     qDebug() << "Date Edit:" << dateEdit->text();
 
     if (pdfPath.isEmpty()) {
-        QMessageBox::warning(this, "Error", "Please select a PDF file first.");
-        return;
+        return INPUT_PDF_NOT_FOUND;
     }
 
     QString pageRange = pageRangeEdit->text().trimmed();
-    QString keywords = keywordEdit->text().trimmed(); // Now multiple keywords
+    QString keywords = keywordEdit->text().trimmed();
     QString date = dateEdit->text().trimmed();
 
     ExtractionMethod method = ExtractionMethod::None;
@@ -286,8 +436,7 @@ void PdfExtractionDialog::processPdf() {
     }
 
     if (method == ExtractionMethod::None) {
-        QMessageBox::warning(this, "Error", "Please enter a page range, keywords, or a date.");
-        return;
+        return INVALID_KEYWORD_INPUT; // Re-using for "No criteria entered"
     }
 
     QStringList pagesToExtract;
@@ -296,8 +445,7 @@ void PdfExtractionDialog::processPdf() {
     if (method == ExtractionMethod::Date) {
         keywordList = parseDateStrings(date);
         if (keywordList.isEmpty()) {
-            QMessageBox::warning(this, "Error", "Invalid date format. Please use MM-DD-YYYY or similar, separated by commas.");
-            return;
+            return INVALID_DATE_INPUT_FORMAT;
         }
     } else if (method == ExtractionMethod::Keyword) {
         keywordList = keywords.split(',', Qt::SkipEmptyParts);
@@ -307,127 +455,35 @@ void PdfExtractionDialog::processPdf() {
     } else if (method == ExtractionMethod::PageRange) {
         QRegularExpression pageRangePattern("^(?:[0-9]+(?:-(?:[0-9]+|end))?)(?:,[0-9]+(?:-(?:[0-9]+|end))?)*$");
         if (!pageRangePattern.match(pageRange).hasMatch()) {
-            QMessageBox::warning(this, "Error", "Invalid page range format. Use formats like 1-5, 250,687,1000, 250-687, or 1-end.");
-            return;
+            return INVALID_PAGE_RANGE_FORMAT;
         }
         pagesToExtract = pageRange.split(',', Qt::SkipEmptyParts);
     }
 
+    // If method is Date or Keyword, find matching page numbers first
     if (method == ExtractionMethod::Date || method == ExtractionMethod::Keyword) {
-        if (system("pdftotext -v > /dev/null 2>&1") != 0) {
-            QMessageBox::critical(this, "Error",
-                "pdftotext is not installed. Please install it first:\nsudo apt install poppler-utils");
-            return;
-        }
+        QPair<QStringList, PdfExtractorError> result = findMatchingPageNumbers(method, keywordList);
+        pagesToExtract = result.first;
+        PdfExtractorError error = result.second;
 
-        qDebug() << "Parsed Keywords:" << keywordList;
-
-        int numPages = 0;
-
-        // Get the number of pages
-        QProcess countProcess;
-        countProcess.start("pdftk", QStringList() << pdfPath << "dump_data");
-        countProcess.waitForFinished();
-        QString countOutput = countProcess.readAllStandardOutput();
-        QRegularExpression re("NumberOfPages: (\\d+)");
-        QRegularExpressionMatch match = re.match(countOutput);
-        if (match.hasMatch()) {
-            numPages = match.captured(1).toInt();
-        }
-        qDebug() << "Number of Pages:" << numPages;
-
-        for (int i = 1; i <= numPages; ++i) {
-            QString tempTextFile = QDir::tempPath() + "/pdftotext_temp.txt";
-            QString command = QString("pdftotext -f %1 -l %1 \"%2\" \"%3\"").arg(i).arg(pdfPath).arg(tempTextFile);
-            qDebug() << "Executing pdftotext command:" << command;
-            int ret = system(command.toStdString().c_str());
-
-            QString pageText;
-            if (ret == 0) {
-                QFile file(tempTextFile);
-                if (file.open(QIODevice::ReadOnly)) {
-                    pageText = file.readAll();
-                    file.close();
-                    file.remove();
-                }
-            }
-            qDebug() << "Page" << i << "Text:\n" << pageText; // Print full page text
-
-            bool pageMatches = false;
-            if (method == ExtractionMethod::Date || matchAnyKeywordRadio->isChecked()) {
-                // Match ANY keyword (OR logic) or Date (always OR logic)
-                for (const QString& key : keywordList) {
-                    if (substringRadio->isChecked()) {
-                        if (pageText.contains(key, Qt::CaseInsensitive)) {
-                            pageMatches = true;
-                            break;
-                        }
-                    } else { // Whole word search
-                        QRegularExpression re("\\b" + QRegularExpression::escape(key) + "\\b", QRegularExpression::CaseInsensitiveOption);
-                        if (pageText.contains(re)) {
-                            pageMatches = true;
-                            break;
-                        }
-                    }
-                }
-            } else if (matchAllKeywordsRadio->isChecked()) {
-                // Match ALL keywords (AND logic)
-                bool allMatch = true;
-                for (const QString& key : keywordList) {
-                    if (substringRadio->isChecked()) {
-                        if (!pageText.contains(key, Qt::CaseInsensitive)) {
-                            allMatch = false;
-                            break;
-                        }
-                    } else { // Whole word search
-                        QRegularExpression re("\\b" + QRegularExpression::escape(key) + "\\b", QRegularExpression::CaseInsensitiveOption);
-                        if (!pageText.contains(re)) {
-                            allMatch = false;
-                            break;
-                        }
-                    }
-                }
-                pageMatches = allMatch;
-            } else { // Default to match ANY if no radio button is selected (shouldn't happen with UI)
-                for (const QString& key : keywordList) {
-                    if (substringRadio->isChecked()) {
-                        if (pageText.contains(key, Qt::CaseInsensitive)) {
-                            pageMatches = true;
-                            break;
-                        }
-                    }
-                    else { // Whole word search
-                        QRegularExpression re("\\b" + QRegularExpression::escape(key) + "\\b", QRegularExpression::CaseInsensitiveOption);
-                        if (pageText.contains(re)) {
-                            pageMatches = true;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            // Apply threshold for keyword search only (not for date search)
-            if (method == ExtractionMethod::Keyword && thresholdEdit->text().toInt() > 0) {
-                int totalMatchCount = 0;
-                for (const QString& key : keywordList) {
-                    totalMatchCount += pageText.count(key, Qt::CaseInsensitive);
-                }
-                if (totalMatchCount < thresholdEdit->text().toInt()) {
-                    pageMatches = false; // Override if threshold not met
-                }
-            }
-
-            if(pageMatches) {
-                pagesToExtract << QString::number(i);
-            }
+        if (error != SUCCESS) {
+            pageNumbersDisplay->clear();
+            pageNumbersDisplay->parentWidget()->setVisible(false);
+            return error;
         }
 
         if (pagesToExtract.isEmpty()) {
-            QMessageBox::information(this, "No Match", "No pages were found containing the specified keyword(s).");
-            return;
+            pageNumbersDisplay->clear(); // Clear previous results
+            pageNumbersDisplay->parentWidget()->setVisible(false); // Hide the group box
+            return NO_PAGES_EXTRACTED;
+        } else {
+            // Display page numbers and make the group box visible
+            pageNumbersDisplay->setText(pagesToExtract.join(", "));
+            pageNumbersDisplay->parentWidget()->setVisible(true);
         }
     }
 
+    // Proceed with PDFTK operations
     QString outputFile = generateOutputFilename(method);
     outputEdit->setText(outputFile);
 
@@ -437,9 +493,7 @@ void PdfExtractionDialog::processPdf() {
     QString escapedPageRange = QString(pdftkPageRange).replace("\"", "\\\"");
 
     if (system("pdftk --version > /dev/null 2>&1") != 0) {
-        QMessageBox::critical(this, "Error",
-            "pdftk is not installed. Please install it first:\nsudo apt install pdftk");
-        return;
+        return PDFTK_NOT_INSTALLED;
     }
 
     QString command = QString("pdftk A=\"%1\" cat A%2 output \"%3\"")
@@ -452,9 +506,9 @@ void PdfExtractionDialog::processPdf() {
     QString watermarkPdfPath;
     if (watermarkCheck->isChecked() && !watermarkText->text().isEmpty()) {
         watermarkPdfPath = QDir::tempPath() + "/watermark_temp.pdf";
-        if (!createWatermarkPdf(watermarkText->text(), watermarkPdfPath)) {
-            QMessageBox::critical(this, "Error", "Failed to create watermark PDF.");
-            return;
+        PdfExtractorError watermarkError = createWatermarkPdf(watermarkText->text(), watermarkPdfPath);
+        if (watermarkError != SUCCESS) {
+            return watermarkError;
         }
         command = QString("pdftk A=\"%1\" B=\"%2\" cat A%3 output \"%4\" stamp B").arg(escapedPdfPath, watermarkPdfPath, escapedPageRange, escapedOutputFile);
         if (compressCheck->isChecked()) {
@@ -467,30 +521,146 @@ void PdfExtractionDialog::processPdf() {
 
     qDebug() << "Executing pdftk command:" << command;
 
-    // Execute command
     int exitCode = system(command.toStdString().c_str());
 
-    // Clean up temporary watermark PDF
     if (!watermarkPdfPath.isEmpty()) {
         QFile::remove(watermarkPdfPath);
     }
 
-    if (exitCode == 0) {
-        QMessageBox::information(this, "Success",
-            QString("PDF successfully extracted to:\n%1").arg(QDir::toNativeSeparators(outputFile)));
-    } else {
-        // Read error output from temporary file
+    if (exitCode != 0) {
         QString errorMessage;
         QFile errorFileHandle(errorFile);
         if (errorFileHandle.open(QIODevice::ReadOnly)) {
             QTextStream in(&errorFileHandle);
             errorMessage = in.readAll();
             errorFileHandle.close();
-            errorFileHandle.remove(); // Clean up
+            errorFileHandle.remove();
+            qDebug() << "pdftk error message: " << errorMessage;
         } else {
-            errorMessage = "Failed to read pdftk error output.";
+            qDebug() << "Failed to read pdftk error output file.";
+            return TEMP_FILE_IO_ERROR;
         }
-        QMessageBox::critical(this, "Error",
-            QString("pdftk failed with error:\n%1").arg(errorMessage));
+        return PDFTK_COMMAND_FAILED;
+    }
+
+    return SUCCESS;
+}
+
+    
+
+    
+
+void PdfExtractionDialog::showPageNumbers() {
+    qDebug() << "Show Page Numbers clicked.";
+
+    if (pdfPath.isEmpty()) {
+        displayError(INPUT_PDF_NOT_FOUND);
+        return;
+    }
+
+    QString keywords = keywordEdit->text().trimmed();
+    QString date = dateEdit->text().trimmed();
+
+    ExtractionMethod method = ExtractionMethod::None;
+    if (!date.isEmpty()) {
+        method = ExtractionMethod::Date;
+    } else if (!keywords.isEmpty()) {
+        method = ExtractionMethod::Keyword;
+    } else {
+        displayError(INVALID_KEYWORD_INPUT); // Re-using for "No criteria entered"
+        return;
+    }
+
+    QStringList keywordList;
+    if (method == ExtractionMethod::Date) {
+        keywordList = parseDateStrings(date);
+        if (keywordList.isEmpty()) {
+            displayError(INVALID_DATE_INPUT_FORMAT);
+            return;
+        }
+    } else if (method == ExtractionMethod::Keyword) {
+        keywordList = keywords.split(',', Qt::SkipEmptyParts);
+        for(auto& kw : keywordList) {
+            kw = kw.trimmed();
+        }
+    }
+
+    QPair<QStringList, PdfExtractorError> result = findMatchingPageNumbers(method, keywordList);
+    QStringList pagesToExtract = result.first;
+    PdfExtractorError error = result.second;
+
+    if (error != SUCCESS) {
+        pageNumbersDisplay->clear();
+        pageNumbersDisplay->parentWidget()->setVisible(false);
+        displayError(error);
+        return;
+    }
+
+    if (pagesToExtract.isEmpty()) {
+        pageNumbersDisplay->clear();
+        pageNumbersDisplay->parentWidget()->setVisible(false);
+        displayError(NO_PAGES_EXTRACTED);
+    } else {
+        pageNumbersDisplay->setText(pagesToExtract.join(", "));
+        pageNumbersDisplay->parentWidget()->setVisible(true);
+        QMessageBox::information(this, "Page Numbers Found", "Matching page numbers displayed.");
+    }
+}
+
+void PdfExtractionDialog::displayError(PdfExtractorError errorCode) {
+    QString title = "Error";
+    QString message;
+
+    switch (errorCode) {
+        case SUCCESS:
+            title = "Success";
+            message = QString("PDF successfully extracted to:\n%1").arg(QDir::toNativeSeparators(outputEdit->text()));
+            break;
+        case PDFTK_COMMAND_FAILED:
+            message = "pdftk command failed. Check the input PDF and options. Error Code: " + QString::number(errorCode);
+            break;
+        case PDFTOTEXT_COMMAND_FAILED:
+            message = "pdftotext command failed. Check the input PDF and options. Error Code: " + QString::number(errorCode);
+            break;
+        case PDFTOTEXT_NOT_INSTALLED:
+            message = "pdftotext is not installed. Please install it first:\nsudo apt install poppler-utils. Error Code: " + QString::number(errorCode);
+            break;
+        case PDFTK_NOT_INSTALLED:
+            message = "pdftk is not installed. Please install it first:\nsudo apt install pdftk. Error Code: " + QString::number(errorCode);
+            break;
+        case INPUT_PDF_NOT_FOUND:
+            message = "Please select a PDF file first. Error Code: " + QString::number(errorCode);
+            break;
+        case OUTPUT_PDF_WRITE_ERROR:
+            message = "Failed to write output PDF. Check permissions or disk space. Error Code: " + QString::number(errorCode);
+            break;
+        case TEMP_FILE_IO_ERROR:
+            message = "Temporary file I/O error. Please try again. Error Code: " + QString::number(errorCode);
+            break;
+        case INVALID_PAGE_RANGE_FORMAT:
+            message = "Invalid page range format. Use formats like 1-5, 250,687,1000, 250-687, or 1-end. Error Code: " + QString::number(errorCode);
+            break;
+        case INVALID_KEYWORD_INPUT:
+            message = "Please enter a page range, keywords, or a date. Error Code: " + QString::number(errorCode);
+            break;
+        case INVALID_DATE_INPUT_FORMAT:
+            message = "Invalid date format. Please use MM-DD-YYYY or similar, separated by commas. Error Code: " + QString::number(errorCode);
+            break;
+        case NO_PAGES_EXTRACTED:
+            message = "No pages were found containing the specified criteria. Error Code: " + QString::number(errorCode);
+            break;
+        case WATERMARK_PDF_CREATION_FAILED:
+            message = "Failed to create watermark PDF. Error Code: " + QString::number(errorCode);
+            break;
+        case UNKNOWN_ERROR:
+        default:
+            message = "An unknown error occurred. Error Code: " + QString::number(errorCode);
+            break;
+    }
+
+    if (errorCode == SUCCESS) {
+        QMessageBox::information(this, title, message);
+    } else {
+        QMessageBox::critical(this, title, message);
     }
 }

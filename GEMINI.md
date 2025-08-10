@@ -67,7 +67,7 @@ The application prioritizes extraction methods in the following order:
     *   **"Match ALL keywords (AND)"**: If selected, a page is extracted only if it contains all of the provided keywords.
 *   **Threshold:** A minimum number of keyword matches can be specified. If the total count of all keyword occurrences on a page is below this threshold, the page is not extracted (applies only to keyword search, not date search).
 *   **Search Mode:**
-    *   **"Whole Word"**: Uses regular expressions (`\bkeyword\b`) to ensure only complete words are matched.
+    *   **"Whole Word"**: Uses regular expressions (`keyword`) to ensure only complete words are matched.
     *   **"Substring"**: Uses simple string containment (`QString::contains()`) to match any occurrence of the keyword.
 
 ### Output Filename Generation
@@ -98,3 +98,23 @@ The executable will be located at `build/PdfExtractor`.
 *   Debug output from `pdftotext` and `pdftk` is redirected to temporary files or the terminal, making direct capture within the Qt application challenging.
 *   The `system()` command is used for external tool execution, which might have environment-specific behaviors.
 *   The watermarking feature currently applies a single, rotated, semi-transparent text string. More advanced watermarking options (e.g., image watermarks, custom positions, multiple watermarks) are not implemented.
+
+## Version Control
+
+This project is now under Git version control.
+
+## Error Codes
+
+This section defines numerical error codes for various scenarios within the PDF Extractor application. These codes can be used for internal error handling and external reporting.
+
+*   **1000:** Success (No Error)
+*   **2001:** `pdftk` Command Execution Failed
+*   **2002:** `pdftotext` Command Execution Failed
+*   **3001:** Input PDF File Not Found/Inaccessible
+*   **3002:** Output PDF File Write Error (Permissions/Disk Full)
+*   **3003:** Temporary File I/O Error
+*   **4001:** Invalid Page Range Format
+*   **4002:** Invalid Keyword Input
+*   **4003:** Invalid Date Input Format
+*   **5001:** No Pages Extracted (Criteria Mismatch)
+*   **5002:** Watermark PDF Creation Failed
