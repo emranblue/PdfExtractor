@@ -1,0 +1,26 @@
+# Build artifacts
+build/
+*.o
+*.moc
+moc_*.cpp
+moc_predefs.h
+main.o
+moc_pdfextractiondialog.o
+pdfextractiondialog.o
+settingsdialog.o
+qrc_*.cpp # For generated resource files
+
+# Backup and temporary files
+backup/
+project # This seems to be an old project directory or build output
+*.pro.user
+*.pro.user.*
+*.qmake.stash
+/tmp/*
+
+# IDE specific files (if any)
+.vscode/
+.idea/
+
+# Executables
+PdfExtractor
