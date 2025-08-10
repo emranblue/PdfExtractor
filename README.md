@@ -90,6 +90,10 @@ For the application icon to appear on your Linux desktop environment (e.g., in y
     sudo update-desktop-database
     ```
 
+## Screenshots
+
+![Screenshot of PDF Extractor](screenshot.png)
+
 ## About
 
 **PDF Extractor**
