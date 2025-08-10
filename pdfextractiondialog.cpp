@@ -21,6 +21,8 @@
 #include <QTextStream>
 #include <QApplication> // For clipboard access
 #include <QClipboard>   // For clipboard access
+#include <QSettings>    // For settings persistence
+#include "settingsdialog.h" // Include the new settings dialog header
 
 PdfExtractionDialog::PdfExtractionDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle("PDF Extraction Tool");
@@ -30,10 +32,15 @@ PdfExtractionDialog::PdfExtractionDialog(QWidget *parent) : QDialog(parent) {
 
     // Menu Bar
     QMenuBar *menuBar = new QMenuBar(this);
+    QMenu *fileMenu = menuBar->addMenu("&File");
+    QAction *settingsAction = fileMenu->addAction("&Settings");
+    QAction *exitAction = fileMenu->addAction("E&xit");
     QMenu *helpMenu = menuBar->addMenu("&Help");
     QAction *aboutAction = helpMenu->addAction("&About");
     mainLayout->setMenuBar(menuBar);
 
+    connect(settingsAction, &QAction::triggered, this, &PdfExtractionDialog::openSettingsDialog);
+    connect(exitAction, &QAction::triggered, this, &PdfExtractionDialog::close);
     connect(aboutAction, &QAction::triggered, this, &PdfExtractionDialog::showAboutDialog);
 
     // Input group
@@ -145,6 +152,26 @@ PdfExtractionDialog::PdfExtractionDialog(QWidget *parent) : QDialog(parent) {
     connect(copyPageNumbersButton, &QPushButton::clicked, this, &PdfExtractionDialog::copyPageNumbersToClipboard); // Connect new button
 
     setLayout(mainLayout);
+
+    // Load default settings on startup
+    QSettings settings("MyCompany", "PdfExtractor");
+    settings.beginGroup("DefaultSettings");
+    pdfPath = settings.value("pdfPath", "/media/emran/sdcard/bcs/total.pdf").toString();
+    pdfPathLabel->setText(QFileInfo(pdfPath).fileName());
+    pageRangeEdit->setText(settings.value("pageRange", "").toString());
+    outputEdit->setText(settings.value("outputDirectory", "").toString());
+    keywordEdit->setText(settings.value("keywords", "").toString());
+    thresholdEdit->setText(QString::number(settings.value("threshold", 0).toInt()));
+    matchAllKeywordsRadio->setChecked(settings.value("matchAllKeywords", false).toBool());
+    matchAnyKeywordRadio->setChecked(!matchAllKeywordsRadio->isChecked());
+    wholeWordRadio->setChecked(settings.value("wholeWordSearch", false).toBool());
+    substringRadio->setChecked(!wholeWordRadio->isChecked());
+    dateEdit->setText(settings.value("date", "").toString());
+    compressCheck->setChecked(settings.value("compressPdf", false).toBool());
+    watermarkCheck->setChecked(settings.value("addWatermark", false).toBool());
+    watermarkText->setText(settings.value("watermarkText", "").toString());
+    watermarkText->setEnabled(watermarkCheck->isChecked());
+    settings.endGroup();
 }
 
 QWidget* PdfExtractionDialog::createFileSelectionRow(QPushButton* button, QWidget* display) {
@@ -344,12 +371,14 @@ QPair<QStringList, PdfExtractorError> PdfExtractionDialog::findMatchingPageNumbe
                 file.close();
                 file.remove();
             } else {
+                qDebug() << "Error: Could not open temporary text file:" << tempTextFile;
                 return qMakePair(QStringList(), TEMP_FILE_IO_ERROR);
             }
         } else {
+            qDebug() << "Error: pdftotext command failed with exit code:" << ret;
             return qMakePair(QStringList(), PDFTOTEXT_COMMAND_FAILED);
         }
-        qDebug() << "Page" << i << "Text:\n" << pageText;
+        qDebug() << "Page" << i << "Text:\n" << pageText.left(500) << "..."; // Log first 500 chars
 
         bool pageMatches = false;
         if (method == ExtractionMethod::Date || matchAnyKeywordRadio->isChecked()) {
@@ -433,6 +462,14 @@ PdfExtractorError PdfExtractionDialog::executePdfExtractionLogic() {
     QString pageRange = pageRangeEdit->text().trimmed();
     QString keywords = keywordEdit->text().trimmed();
     QString date = dateEdit->text().trimmed();
+
+    // Use default values if fields are empty
+    QSettings settings("MyCompany", "PdfExtractor");
+    settings.beginGroup("DefaultSettings");
+    if (pageRange.isEmpty()) pageRange = settings.value("pageRange", "").toString();
+    if (keywords.isEmpty()) keywords = settings.value("keywords", "").toString();
+    if (date.isEmpty()) date = settings.value("date", "").toString();
+    settings.endGroup();
 
     ExtractionMethod method = ExtractionMethod::None;
     if (!date.isEmpty()) {
@@ -569,6 +606,13 @@ void PdfExtractionDialog::showPageNumbers() {
     QString keywords = keywordEdit->text().trimmed();
     QString date = dateEdit->text().trimmed();
 
+    // Use default values if fields are empty
+    QSettings settings("MyCompany", "PdfExtractor");
+    settings.beginGroup("DefaultSettings");
+    if (keywords.isEmpty()) keywords = settings.value("keywords", "").toString();
+    if (date.isEmpty()) date = settings.value("date", "").toString();
+    settings.endGroup();
+
     ExtractionMethod method = ExtractionMethod::None;
     if (!date.isEmpty()) {
         method = ExtractionMethod::Date;
@@ -630,6 +674,11 @@ void PdfExtractionDialog::showAboutDialog() {
                        "Dependencies: pdftk, poppler-utils (pdftotext)<br/>" 
                        "<br/>" 
                        "&copy; 2025 All rights reserved.");
+}
+
+void PdfExtractionDialog::openSettingsDialog() {
+    SettingsDialog settingsDialog(this);
+    settingsDialog.exec();
 }
 
 void PdfExtractionDialog::displayError(PdfExtractorError errorCode) {

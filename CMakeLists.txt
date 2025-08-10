@@ -12,6 +12,8 @@ add_executable(PdfExtractor
     main.cpp
     pdfextractiondialog.h
     pdfextractiondialog.cpp
+    settingsdialog.h
+    settingsdialog.cpp
     resources.qrc
 )
 

@@ -32,6 +32,7 @@ private slots:
     void showPageNumbers(); // New slot for showing page numbers only
     void copyPageNumbersToClipboard(); // New slot for clipboard functionality
     void showAboutDialog(); // New slot for displaying the About dialog
+    void openSettingsDialog(); // New slot for opening the settings dialog
 
 private:
     QString pdfPath;
