@@ -1,0 +1,9 @@
+#!/usr/bin/env xdg-open
+[Desktop Entry]
+Name=PDF Extractor
+Comment=Extract pages from PDF files
+Exec=/media/emran/sdcard/pytool/project/build/PdfExtractor
+Icon=/media/emran/sdcard/pytool/project/icons/app_icon.png
+Terminal=false
+Type=Application
+Categories=Utility;
