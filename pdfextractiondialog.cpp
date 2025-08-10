@@ -624,6 +624,8 @@ void PdfExtractionDialog::showAboutDialog() {
                        "by page range, keywords, or dates.<br/>" 
                        "<br/>" 
                        "Developed by: Gemini CLI Agent<br/>" 
+                       "Instructed by: Emran Hossain<br/>" 
+                       "Contact: emran.blue.120@gmail.com<br/>" 
                        "<br/>" 
                        "Dependencies: pdftk, poppler-utils (pdftotext)<br/>" 
                        "<br/>" 
