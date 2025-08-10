@@ -22,6 +22,8 @@
 #include <QApplication> // For clipboard access
 #include <QClipboard>   // For clipboard access
 #include <QSettings>    // For settings persistence
+#include <QDesktopServices> // For opening files
+#include <QUrl>             // For opening files
 #include "settingsdialog.h" // Include the new settings dialog header
 
 PdfExtractionDialog::PdfExtractionDialog(QWidget *parent) : QDialog(parent) {
@@ -664,6 +666,7 @@ void PdfExtractionDialog::showAboutDialog() {
                        "<b>PDF Extractor</b><br/>" 
                        "Version 1.0<br/>" 
                        "<br/>" 
+                       "This project is all about BCS exam, to study paper more organized way.<br/>" 
                        "This application allows you to extract pages from PDF files " 
                        "by page range, keywords, or dates.<br/>" 
                        "<br/>" 
@@ -689,7 +692,14 @@ void PdfExtractionDialog::displayError(PdfExtractorError errorCode) {
         case SUCCESS:
             title = "Success";
             message = QString("PDF successfully extracted to:\n%1").arg(QDir::toNativeSeparators(outputEdit->text()));
-            break;
+            QMessageBox::information(this, title, message); // Display success message first
+
+            // Ask user if they want to open the PDF
+            if (QMessageBox::question(this, "Open PDF", "PDF extracted successfully. Do you want to open it?",
+                                      QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
+                QDesktopServices::openUrl(QUrl::fromLocalFile(outputEdit->text()));
+            }
+            return; // Return after handling success and potential PDF opening
         case PDFTK_COMMAND_FAILED:
             message = "pdftk command failed. Check the input PDF and options. Error Code: " + QString::number(errorCode);
             break;
@@ -732,9 +742,6 @@ void PdfExtractionDialog::displayError(PdfExtractorError errorCode) {
             break;
     }
 
-    if (errorCode == SUCCESS) {
-        QMessageBox::information(this, title, message);
-    } else {
-        QMessageBox::critical(this, title, message);
-    }
+    // For error cases, display critical message
+    QMessageBox::critical(this, title, message);
 }
