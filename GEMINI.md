@@ -30,8 +30,11 @@ This is a C++ Qt application for extracting pages from PDF files.
     *   Default keywords and search options
     *   Default date
     *   Default compression and watermark settings
+    *   Application font size
+    *   Application theme color
     These settings are persisted using `QSettings` and are loaded on application startup.
 *   **About Dialog:** An "About" dialog, accessible via the "Help" menu, provides information about the application, its purpose (for BCS exam paper organization), version, dependencies, and developer credits.
+*   **Manual Window Resizing:** The main window and settings dialog can now be manually resized.
 
 ## Dependencies
 
