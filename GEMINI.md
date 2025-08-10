@@ -15,10 +15,23 @@ This is a C++ Qt application for extracting pages from PDF files.
     *   Parses various date formats (MM-DD-YYYY, Month Day, Year).
     *   Defaults year to 2025 if not provided.
     *   Searches for dates in "MONTH DAY, YEAR" format (e.g., "APRIL 21, 2025").
+*   **Display Matching Page Numbers:** A dedicated "Show Page Numbers" button allows users to find and display page numbers that match date or keyword criteria without extracting the PDF.
+*   **Copy Page Numbers to Clipboard:** The displayed page numbers can be copied to the system clipboard for easy use.
+*   **Open PDF After Extraction:** After a successful PDF extraction, a pop-up dialog asks the user if they want to open the newly created PDF.
 *   **Compress the output PDF.**
 *   **Add watermark to the output PDF:** Overlays text as a semi-transparent watermark.
 *   **GUI for selecting input/output files and options.**
 *   **Default Input PDF:** Automatically selects `/media/emran/sdcard/bcs/total.pdf` as the default input file.
+*   **Application Icon:** The application now features a custom icon, visible in the window title bar and as an executable icon on Linux desktop environments.
+*   **Settings Dialog:** A new "Settings" dialog allows users to configure and save default values for various input fields, including:
+    *   Default PDF path
+    *   Default page range
+    *   Default output directory (with a file selector)
+    *   Default keywords and search options
+    *   Default date
+    *   Default compression and watermark settings
+    These settings are persisted using `QSettings` and are loaded on application startup.
+*   **About Dialog:** An "About" dialog, accessible via the "Help" menu, provides information about the application, its purpose (for BCS exam paper organization), version, dependencies, and developer credits.
 
 ## Dependencies
 
@@ -41,6 +54,7 @@ The application prioritizes extraction methods in the following order:
 
 *   `pdftotext` is used to extract text content from each page of the input PDF.
 *   The output of `pdftotext` for each page is written to a temporary file (`/tmp/pdftotext_temp.txt`) and then read back into the application. This approach was chosen to ensure compatibility with the `system()` command execution in the Qt environment.
+*   **Improved Logging:** Added detailed debug logging for `pdftotext` command execution and extracted page text to aid in debugging.
 
 ### PDF Manipulation (`pdftk`)
 
@@ -67,7 +81,7 @@ The application prioritizes extraction methods in the following order:
     *   **"Match ALL keywords (AND)"**: If selected, a page is extracted only if it contains all of the provided keywords.
 *   **Threshold:** A minimum number of keyword matches can be specified. If the total count of all keyword occurrences on a page is below this threshold, the page is not extracted (applies only to keyword search, not date search).
 *   **Search Mode:**
-    *   **"Whole Word"**: Uses regular expressions (`keyword`) to ensure only complete words are matched.
+    *   **"Whole Word"**: Uses regular expressions (`\bkeyword\b`) to ensure only complete words are matched.
     *   **"Substring"**: Uses simple string containment (`QString::contains()`) to match any occurrence of the keyword.
 
 ### Output Filename Generation
