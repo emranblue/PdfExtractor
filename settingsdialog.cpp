@@ -8,10 +8,10 @@
 #include <QDebug>
 #include <QHBoxLayout>
 #include <QFileDialog> // Added for QFileDialog
+#include <QColorDialog>
 
 SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle("Settings");
-    setFixedSize(400, 500);
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
@@ -61,10 +61,23 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     defaultWatermarkTextEdit = new QLineEdit(this);
     defaultWatermarkTextEdit->setPlaceholderText("Watermark text");
     defaultWatermarkTextEdit->setEnabled(false);
+    defaultWatermarkColorButton = new QPushButton("Color", this);
+    defaultWatermarkFontSizeSpinBox = new QSpinBox(this);
+    defaultWatermarkFontSizeSpinBox->setRange(1, 200);
+
     QHBoxLayout *watermarkLayout = new QHBoxLayout();
     watermarkLayout->addWidget(defaultAddWatermarkCheck);
     watermarkLayout->addWidget(defaultWatermarkTextEdit);
+    watermarkLayout->addWidget(defaultWatermarkColorButton);
+    watermarkLayout->addWidget(defaultWatermarkFontSizeSpinBox);
     formLayout->addRow("Watermark:", watermarkLayout);
+
+    appFontSizeSpinBox = new QSpinBox(this);
+    appFontSizeSpinBox->setRange(6, 24);
+    formLayout->addRow("Application Font Size:", appFontSizeSpinBox);
+
+    themeColorButton = new QPushButton("Select Theme Color", this);
+    formLayout->addRow("Theme Color:", themeColorButton);
 
     mainLayout->addWidget(defaultValuesGroup);
 
@@ -75,6 +88,8 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     connect(buttonBox, &QDialogButtonBox::accepted, this, &SettingsDialog::accept);
     connect(buttonBox, &QDialogButtonBox::rejected, this, &SettingsDialog::reject);
     connect(defaultAddWatermarkCheck, &QCheckBox::toggled, this, &SettingsDialog::toggleWatermarkText);
+    connect(defaultWatermarkColorButton, &QPushButton::clicked, this, &SettingsDialog::selectWatermarkColor);
+    connect(themeColorButton, &QPushButton::clicked, this, &SettingsDialog::selectThemeColor);
     connect(defaultOutputDirectoryBrowseButton, &QPushButton::clicked, this, &SettingsDialog::selectDefaultOutputDirectory);
 
     loadSettings(); // Load settings when dialog is initialized
@@ -94,6 +109,10 @@ void SettingsDialog::saveSettings() {
     settings.setValue("compressPdf", defaultCompressPdfCheck->isChecked());
     settings.setValue("addWatermark", defaultAddWatermarkCheck->isChecked());
     settings.setValue("watermarkText", defaultWatermarkTextEdit->text());
+    settings.setValue("watermarkColor", watermarkColor);
+    settings.setValue("watermarkFontSize", defaultWatermarkFontSizeSpinBox->value());
+    settings.setValue("appFontSize", appFontSizeSpinBox->value());
+    settings.setValue("themeColor", m_themeColor);
     settings.endGroup();
     qDebug() << "Settings saved.";
 }
@@ -114,6 +133,10 @@ void SettingsDialog::loadSettings() {
     defaultCompressPdfCheck->setChecked(settings.value("compressPdf", false).toBool());
     defaultAddWatermarkCheck->setChecked(settings.value("addWatermark", false).toBool());
     defaultWatermarkTextEdit->setText(settings.value("watermarkText", "").toString());
+    watermarkColor = settings.value("watermarkColor", QColor(Qt::red)).value<QColor>();
+    defaultWatermarkFontSizeSpinBox->setValue(settings.value("watermarkFontSize", 72).toInt());
+    appFontSizeSpinBox->setValue(settings.value("appFontSize", 12).toInt());
+    m_themeColor = settings.value("themeColor", QColor(Qt::white)).value<QColor>();
     settings.endGroup();
     qDebug() << "Settings loaded.";
 
@@ -123,6 +146,8 @@ void SettingsDialog::loadSettings() {
 
 void SettingsDialog::toggleWatermarkText(bool checked) {
     defaultWatermarkTextEdit->setEnabled(checked);
+    defaultWatermarkColorButton->setEnabled(checked);
+    defaultWatermarkFontSizeSpinBox->setEnabled(checked);
 }
 
 void SettingsDialog::selectDefaultOutputDirectory() {
@@ -130,6 +155,20 @@ void SettingsDialog::selectDefaultOutputDirectory() {
                                                         defaultOutputDirectoryEdit->text());
     if (!directory.isEmpty()) {
         defaultOutputDirectoryEdit->setText(directory);
+    }
+}
+
+void SettingsDialog::selectWatermarkColor() {
+    QColor color = QColorDialog::getColor(watermarkColor, this, "Select Watermark Color");
+    if (color.isValid()) {
+        watermarkColor = color;
+    }
+}
+
+void SettingsDialog::selectThemeColor() {
+    QColor color = QColorDialog::getColor(m_themeColor, this, "Select Theme Color");
+    if (color.isValid()) {
+        m_themeColor = color;
     }
 }
 
@@ -145,6 +184,10 @@ QString SettingsDialog::defaultDate() const { return defaultDateEdit->text(); }
 bool SettingsDialog::defaultCompressPdf() const { return defaultCompressPdfCheck->isChecked(); }
 bool SettingsDialog::defaultAddWatermark() const { return defaultAddWatermarkCheck->isChecked(); }
 QString SettingsDialog::defaultWatermarkText() const { return defaultWatermarkTextEdit->text(); }
+QColor SettingsDialog::defaultWatermarkColor() const { return watermarkColor; }
+int SettingsDialog::defaultWatermarkFontSize() const { return defaultWatermarkFontSizeSpinBox->value(); }
+int SettingsDialog::appFontSize() const { return appFontSizeSpinBox->value(); }
+QColor SettingsDialog::themeColor() const { return m_themeColor; }
 
 // Setters
 void SettingsDialog::setDefaultPdfPath(const QString &path) { defaultPdfPathEdit->setText(path); }
@@ -158,3 +201,7 @@ void SettingsDialog::setDefaultDate(const QString &date) { defaultDateEdit->setT
 void SettingsDialog::setDefaultCompressPdf(bool checked) { defaultCompressPdfCheck->setChecked(checked); }
 void SettingsDialog::setDefaultAddWatermark(bool checked) { defaultAddWatermarkCheck->setChecked(checked); }
 void SettingsDialog::setDefaultWatermarkText(const QString &text) { defaultWatermarkTextEdit->setText(text); }
+void SettingsDialog::setDefaultWatermarkColor(const QColor &color) { watermarkColor = color; }
+void SettingsDialog::setDefaultWatermarkFontSize(int size) { defaultWatermarkFontSizeSpinBox->setValue(size); }
+void SettingsDialog::setAppFontSize(int size) { appFontSizeSpinBox->setValue(size); }
+void SettingsDialog::setThemeColor(const QColor &color) { m_themeColor = color; }

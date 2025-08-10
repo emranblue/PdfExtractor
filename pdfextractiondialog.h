@@ -10,6 +10,7 @@
 #include <QPushButton> // New include for QPushButton
 #include <QMenuBar> // New include for QMenuBar
 #include <QAction> // New include for QAction
+#include <QSpinBox>
 #include "errorcodes.h" // Include the new error codes header
 
 enum class ExtractionMethod {
@@ -42,6 +43,9 @@ private:
     QCheckBox *compressCheck;
     QCheckBox *watermarkCheck;
     QLineEdit *watermarkText;
+    QPushButton *watermarkColorButton;
+    QSpinBox *watermarkFontSizeSpinBox;
+    QColor watermarkColor;
     QLineEdit *keywordEdit;
     QLineEdit *thresholdEdit;
     QRadioButton *matchAllKeywordsRadio;
@@ -59,6 +63,8 @@ private:
     PdfExtractorError executePdfExtractionLogic(); // New function to encapsulate logic and return error
     QPair<QStringList, PdfExtractorError> findMatchingPageNumbers(ExtractionMethod method, const QStringList &keywordList); // New function to find matching page numbers
     void displayError(PdfExtractorError errorCode); // New function to display error messages
+private slots:
+    void selectWatermarkColor();
 };
 
 #endif // PDFEXTRACTIONDIALOG_H

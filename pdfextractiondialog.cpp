@@ -15,6 +15,9 @@
 #include <QRegularExpression>
 #include <QPdfWriter>
 #include <QPainter> // Needed for drawing text on the PDF
+#include <QColorDialog>
+#include <QSpinBox>
+#include <QFont>
 #include <QRegularExpression>
 #include <cstdlib> // For system()
 #include <QFile>   // For reading error output
@@ -28,7 +31,6 @@
 
 PdfExtractionDialog::PdfExtractionDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle("PDF Extraction Tool");
-    setFixedSize(700, 600);
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
@@ -117,9 +119,16 @@ PdfExtractionDialog::PdfExtractionDialog(QWidget *parent) : QDialog(parent) {
     watermarkText->setPlaceholderText("Watermark text");
     watermarkText->setEnabled(false);
 
+    watermarkColorButton = new QPushButton("Color", this);
+    watermarkFontSizeSpinBox = new QSpinBox(this);
+    watermarkFontSizeSpinBox->setRange(1, 200);
+    watermarkFontSizeSpinBox->setValue(72);
+
     QHBoxLayout *watermarkLayout = new QHBoxLayout();
     watermarkLayout->addWidget(watermarkCheck);
     watermarkLayout->addWidget(watermarkText);
+    watermarkLayout->addWidget(watermarkColorButton);
+    watermarkLayout->addWidget(watermarkFontSizeSpinBox);
     optionsLayout->addLayout(watermarkLayout);
 
     mainLayout->addWidget(inputGroup);
@@ -151,6 +160,7 @@ PdfExtractionDialog::PdfExtractionDialog(QWidget *parent) : QDialog(parent) {
     connect(outputBrowseButton, &QPushButton::clicked, this, &PdfExtractionDialog::selectOutputFile);
     connect(processButton, &QPushButton::clicked, this, &PdfExtractionDialog::processPdf);
     connect(watermarkCheck, &QCheckBox::toggled, watermarkText, &QLineEdit::setEnabled);
+    connect(watermarkColorButton, &QPushButton::clicked, this, &PdfExtractionDialog::selectWatermarkColor);
     connect(copyPageNumbersButton, &QPushButton::clicked, this, &PdfExtractionDialog::copyPageNumbersToClipboard); // Connect new button
 
     setLayout(mainLayout);
@@ -173,6 +183,8 @@ PdfExtractionDialog::PdfExtractionDialog(QWidget *parent) : QDialog(parent) {
     watermarkCheck->setChecked(settings.value("addWatermark", false).toBool());
     watermarkText->setText(settings.value("watermarkText", "").toString());
     watermarkText->setEnabled(watermarkCheck->isChecked());
+    watermarkColor = settings.value("watermarkColor", QColor(Qt::red)).value<QColor>();
+    watermarkFontSizeSpinBox->setValue(settings.value("watermarkFontSize", 72).toInt());
     settings.endGroup();
 }
 
@@ -308,9 +320,9 @@ PdfExtractorError PdfExtractionDialog::createWatermarkPdf(const QString &waterma
 
     // Set font and color for the watermark
     QFont font = painter.font();
-    font.setPointSize(72); // Large font size
+    font.setPointSize(watermarkFontSizeSpinBox->value()); // Large font size
     painter.setFont(font);
-    QColor textColor = Qt::red;
+    QColor textColor = watermarkColor;
     textColor.setAlpha(50); // Semi-transparent
     painter.setPen(textColor);
 
@@ -323,6 +335,13 @@ PdfExtractorError PdfExtractionDialog::createWatermarkPdf(const QString &waterma
 
     painter.end();
     return SUCCESS;
+}
+
+void PdfExtractionDialog::selectWatermarkColor() {
+    QColor color = QColorDialog::getColor(watermarkColor, this, "Select Watermark Color");
+    if (color.isValid()) {
+        watermarkColor = color;
+    }
 }
 
 void PdfExtractionDialog::processPdf() {

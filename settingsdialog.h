@@ -5,6 +5,9 @@
 #include <QLineEdit>
 #include <QCheckBox>
 #include <QRadioButton>
+#include <QColor>
+#include <QSpinBox>
+#include <QPushButton>
 
 class SettingsDialog : public QDialog {
     Q_OBJECT
@@ -24,6 +27,10 @@ public:
     bool defaultCompressPdf() const;
     bool defaultAddWatermark() const;
     QString defaultWatermarkText() const;
+    QColor defaultWatermarkColor() const;
+    int defaultWatermarkFontSize() const;
+    int appFontSize() const;
+    QColor themeColor() const;
 
     // Setters for settings (to populate dialog from current settings)
     void setDefaultPdfPath(const QString &path);
@@ -37,12 +44,18 @@ public:
     void setDefaultCompressPdf(bool checked);
     void setDefaultAddWatermark(bool checked);
     void setDefaultWatermarkText(const QString &text);
+    void setDefaultWatermarkColor(const QColor &color);
+    void setDefaultWatermarkFontSize(int size);
+    void setAppFontSize(int size);
+    void setThemeColor(const QColor &color);
 
 private slots:
     void saveSettings();
     void loadSettings(); // To load settings when dialog opens
     void toggleWatermarkText(bool checked);
     void selectDefaultOutputDirectory(); // New slot for selecting default output directory
+    void selectWatermarkColor();
+    void selectThemeColor();
 
 private:
     QLineEdit *defaultPdfPathEdit;
@@ -59,6 +72,12 @@ private:
     QCheckBox *defaultCompressPdfCheck;
     QCheckBox *defaultAddWatermarkCheck;
     QLineEdit *defaultWatermarkTextEdit;
+    QPushButton *defaultWatermarkColorButton;
+    QSpinBox *defaultWatermarkFontSizeSpinBox;
+    QColor watermarkColor;
+    QSpinBox *appFontSizeSpinBox;
+    QPushButton *themeColorButton;
+    QColor m_themeColor;
 };
 
 #endif // SETTINGSDIALOG_H
