@@ -12,6 +12,7 @@ add_executable(PdfExtractor
     main.cpp
     pdfextractiondialog.h
     pdfextractiondialog.cpp
+    resources.qrc
 )
 
 target_link_libraries(PdfExtractor PRIVATE

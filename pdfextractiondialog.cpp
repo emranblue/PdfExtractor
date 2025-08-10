@@ -28,6 +28,14 @@ PdfExtractionDialog::PdfExtractionDialog(QWidget *parent) : QDialog(parent) {
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
+    // Menu Bar
+    QMenuBar *menuBar = new QMenuBar(this);
+    QMenu *helpMenu = menuBar->addMenu("&Help");
+    QAction *aboutAction = helpMenu->addAction("&About");
+    mainLayout->setMenuBar(menuBar);
+
+    connect(aboutAction, &QAction::triggered, this, &PdfExtractionDialog::showAboutDialog);
+
     // Input group
     QGroupBox *inputGroup = new QGroupBox("Input Parameters", this);
     QFormLayout *inputLayout = new QFormLayout(inputGroup);
@@ -605,6 +613,21 @@ void PdfExtractionDialog::showPageNumbers() {
         pageNumbersDisplay->parentWidget()->setVisible(true);
         QMessageBox::information(this, "Page Numbers Found", "Matching page numbers displayed.");
     }
+}
+
+void PdfExtractionDialog::showAboutDialog() {
+    QMessageBox::about(this, "About PDF Extractor",
+                       "<b>PDF Extractor</b><br/>" 
+                       "Version 1.0<br/>" 
+                       "<br/>" 
+                       "This application allows you to extract pages from PDF files " 
+                       "by page range, keywords, or dates.<br/>" 
+                       "<br/>" 
+                       "Developed by: Gemini CLI Agent<br/>" 
+                       "<br/>" 
+                       "Dependencies: pdftk, poppler-utils (pdftotext)<br/>" 
+                       "<br/>" 
+                       "&copy; 2025 All rights reserved.");
 }
 
 void PdfExtractionDialog::displayError(PdfExtractorError errorCode) {

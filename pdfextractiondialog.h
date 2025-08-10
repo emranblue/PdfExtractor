@@ -8,6 +8,8 @@
 #include <QRadioButton>
 #include <QTextEdit> // New include for QTextEdit
 #include <QPushButton> // New include for QPushButton
+#include <QMenuBar> // New include for QMenuBar
+#include <QAction> // New include for QAction
 #include "errorcodes.h" // Include the new error codes header
 
 enum class ExtractionMethod {
@@ -29,6 +31,7 @@ private slots:
     void processPdf(); // This slot will now call a function that returns PdfExtractorError
     void showPageNumbers(); // New slot for showing page numbers only
     void copyPageNumbersToClipboard(); // New slot for clipboard functionality
+    void showAboutDialog(); // New slot for displaying the About dialog
 
 private:
     QString pdfPath;
