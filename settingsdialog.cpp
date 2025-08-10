@@ -7,6 +7,7 @@
 #include <QSettings>
 #include <QDebug>
 #include <QHBoxLayout>
+#include <QFileDialog> // Added for QFileDialog
 
 SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle("Settings");
@@ -24,7 +25,11 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     formLayout->addRow("Default Page Range:", defaultPageRangeEdit);
 
     defaultOutputDirectoryEdit = new QLineEdit(this);
-    formLayout->addRow("Default Output Directory:", defaultOutputDirectoryEdit);
+    defaultOutputDirectoryBrowseButton = new QPushButton("Browse...", this);
+    QHBoxLayout *outputDirLayout = new QHBoxLayout();
+    outputDirLayout->addWidget(defaultOutputDirectoryEdit);
+    outputDirLayout->addWidget(defaultOutputDirectoryBrowseButton);
+    formLayout->addRow("Default Output Directory:", outputDirLayout);
 
     defaultKeywordsEdit = new QLineEdit(this);
     formLayout->addRow("Default Keywords:", defaultKeywordsEdit);
@@ -70,6 +75,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     connect(buttonBox, &QDialogButtonBox::accepted, this, &SettingsDialog::accept);
     connect(buttonBox, &QDialogButtonBox::rejected, this, &SettingsDialog::reject);
     connect(defaultAddWatermarkCheck, &QCheckBox::toggled, this, &SettingsDialog::toggleWatermarkText);
+    connect(defaultOutputDirectoryBrowseButton, &QPushButton::clicked, this, &SettingsDialog::selectDefaultOutputDirectory);
 
     loadSettings(); // Load settings when dialog is initialized
 }
@@ -117,6 +123,14 @@ void SettingsDialog::loadSettings() {
 
 void SettingsDialog::toggleWatermarkText(bool checked) {
     defaultWatermarkTextEdit->setEnabled(checked);
+}
+
+void SettingsDialog::selectDefaultOutputDirectory() {
+    QString directory = QFileDialog::getExistingDirectory(this, "Select Default Output Directory",
+                                                        defaultOutputDirectoryEdit->text());
+    if (!directory.isEmpty()) {
+        defaultOutputDirectoryEdit->setText(directory);
+    }
 }
 
 // Getters

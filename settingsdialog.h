@@ -42,11 +42,13 @@ private slots:
     void saveSettings();
     void loadSettings(); // To load settings when dialog opens
     void toggleWatermarkText(bool checked);
+    void selectDefaultOutputDirectory(); // New slot for selecting default output directory
 
 private:
     QLineEdit *defaultPdfPathEdit;
     QLineEdit *defaultPageRangeEdit;
     QLineEdit *defaultOutputDirectoryEdit;
+    QPushButton *defaultOutputDirectoryBrowseButton; // New button for browsing output directory
     QLineEdit *defaultKeywordsEdit;
     QLineEdit *defaultThresholdEdit;
     QRadioButton *defaultMatchAnyKeywordsRadio;
